@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order History • Voucher Manager</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="container">
+    <header class="top-header">
+      <div>
+        <h1>Order History</h1>
+        <p>View and manage customer orders</p>
+      </div>
+      <div class="page-nav">
+        <a class="page-link" href="/">New Voucher</a>
+        <div class="header-badge">Paper Core</div>
+      </div>
+    </header>
+
+    <section class="card orders-card">
+      <div class="section-header">
+        <div>
+          <h2>Orders</h2>
+          <p>Pending, confirmed and cancelled orders</p>
+        </div>
+        <button id="historyRefresh" class="refresh-button" type="button">↻ Refresh</button>
+      </div>
+
+      <div class="status-counters">
+        <button class="counter-card pending-counter active" data-page="pending" type="button"><span class="counter-label">Pending Orders</span><strong id="pendingCount">0</strong></button>
+        <button class="counter-card confirmed-counter" data-page="confirmed" type="button"><span class="counter-label">Confirmed Orders</span><strong id="confirmedCount">0</strong></button>
+        <button class="counter-card cancelled-counter" data-page="cancelled" type="button"><span class="counter-label">Cancelled Orders</span><strong id="cancelledCount">0</strong></button>
+      </div>
+
+      <div class="orders-toolbar">
+        <div class="search-box">
+          <span>⌕</span>
+          <input id="historySearch" type="search" placeholder="Search client, voucher or date..." autocomplete="off">
+        </div>
+      </div>
+
+      <div class="orders-page-title">
+        <h3 id="activeOrdersTitle">Pending Orders</h3>
+      </div>
+
+      <div id="history" class="history"></div>
+      <div id="historyPagination" class="history-pagination"></div>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="/history.js"></script>
+</body>
+</html>
