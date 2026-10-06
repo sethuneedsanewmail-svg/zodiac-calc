@@ -1,120 +1,365 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
   <title>Voucher Manager</title>
-  <link rel="stylesheet" href="/style.css">
+
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  >
+
 </head>
+
+
 <body>
+
   <main class="container">
+
     <header class="top-header">
+
       <div>
-        <h1>Voucher Manager</h1>
-        <p>Create and manage customer vouchers</p>
+
+        <h1>
+          Voucher Manager
+        </h1>
+
+        <p>
+          Create and manage customer vouchers
+        </p>
+
       </div>
+
+
       <div class="page-nav">
-        <a class="page-link" href="/history.html">Order History</a>
-        <div class="header-badge">Paper Core</div>
+
+        <a
+          class="page-link"
+          href="/history.html"
+        >
+          Order History
+        </a>
+
       </div>
+
     </header>
 
+
     <section class="card">
+
       <div class="section-header">
+
         <div>
-          <h2>New Voucher</h2>
-          <p>Create a new customer order</p>
+
+          <h2 id="voucherModeTitle">
+            New Voucher
+          </h2>
+
+          <p id="voucherModeSubtitle">
+            Create a new customer order
+          </p>
+
         </div>
+
+
         <div class="voucher-number">
-          <span>Voucher No.</span>
-          <strong id="voucherNo">—</strong>
+
+          <span>
+            Voucher No.
+          </span>
+
+          <strong id="voucherNumber">
+            New Voucher
+          </strong>
+
+          <span
+            id="editBadge"
+            class="edit-badge"
+            hidden
+          >
+            EDITING
+          </span>
+
         </div>
+
       </div>
+
 
       <div class="form-grid">
-        <div class="form-group">
-          <label for="clientName">Client Name</label>
-          <input id="clientName" type="text" placeholder="Enter client name" autocomplete="off">
+
+        <div class="field">
+
+          <label
+            for="clientName"
+          >
+            Customer Name
+          </label>
+
+          <input
+            id="clientName"
+            type="text"
+            placeholder="Enter customer name"
+            autocomplete="off"
+          >
+
         </div>
-        <div class="form-group">
-          <label for="voucherDate">Date</label>
-          <input id="voucherDate" type="date">
+
+
+        <div class="field">
+
+          <label
+            for="date"
+          >
+            Date
+          </label>
+
+          <input
+            id="date"
+            type="date"
+          >
+
         </div>
+
       </div>
 
-      <div class="products-header">
-        <div>
-          <h3>Products</h3>
-          <p>Add products and set quantities</p>
+
+      <div class="items-section">
+
+        <div class="section-title-row">
+
+          <div>
+
+            <h3>
+              Products
+            </h3>
+
+            <p>
+              Add products and set quantities/prices
+            </p>
+
+          </div>
+
+
+          <button
+            id="addItemBtn"
+            class="secondary-outline"
+            type="button"
+          >
+            + Add Product
+          </button>
+
         </div>
+
+
+        <div
+          id="items"
+          class="items"
+        ></div>
+
       </div>
 
-      <div id="items" class="items-container"></div>
 
-      <button id="addItem" class="add-product" type="button">
-        <span>＋</span> Add Product
-      </button>
+      <div class="total-row">
 
-      <div class="total-box">
-        <span>Total</span>
-        <strong id="grandTotal">₦0</strong>
+        <span>
+          Grand Total
+        </span>
+
+        <strong id="total">
+          ₦0
+        </strong>
+
       </div>
+
 
       <div class="main-actions">
-        <button id="saveBtn" class="primary" type="button">Save Voucher</button>
-        <button id="clearBtn" class="secondary-outline" type="button">Clear</button>
+
+        <button
+          id="saveBtn"
+          class="primary"
+          type="button"
+        >
+          Save Voucher
+        </button>
+
+
+        <button
+          id="cancelEditBtn"
+          class="secondary-outline"
+          type="button"
+          hidden
+        >
+          Cancel Edit
+        </button>
+
+
+        <button
+          id="clearBtn"
+          class="secondary-outline"
+          type="button"
+        >
+          Clear
+        </button>
+
       </div>
 
-      <div id="status" class="status-message"></div>
+
+      <div
+        id="statusMessage"
+        class="status-message"
+      ></div>
+
     </section>
+
 
     <section class="card numbering-card">
+
       <div>
-        <h2>Numbering</h2>
-        <p>Reset today's voucher number only when there are no saved vouchers for today.</p>
+
+        <h2>
+          Voucher Numbering
+        </h2>
+
+        <p>
+          Reset today's numbering and remove today's voucher records.
+        </p>
+
       </div>
-      <button id="resetToday" class="danger-large" type="button">Reset Today's Number</button>
+
+
+      <button
+        id="resetTodayBtn"
+        class="danger-large"
+        type="button"
+      >
+        Reset Today's Numbering
+      </button>
+
     </section>
+
   </main>
 
+
+  <!-- =====================================================
+       ITEM TEMPLATE
+  ====================================================== -->
+
   <template id="itemTemplate">
+
     <div class="item-card">
-      <div class="item-card-header">
-        <div>
-          <span class="item-number">Product</span>
-          <strong class="item-title">Select Product</strong>
-        </div>
-        <button type="button" class="remove">Remove</button>
-      </div>
 
       <div class="product-grid">
-        <div class="form-group product-field">
-          <label>Product</label>
+
+        <div class="field">
+
+          <label>
+            Product
+          </label>
+
           <select class="product">
-            <option value="" selected>Select product</option>
+
+            <option
+              value=""
+              selected
+            >
+              Select product
+            </option>
+
           </select>
+
         </div>
 
-        <div class="form-group">
-          <label>Quantity (cartons)</label>
-          <input class="qty" type="number" min="1" step="1" value="1">
+
+        <div class="field">
+
+          <label>
+            Quantity
+          </label>
+
+          <input
+            class="quantity"
+            type="number"
+            min="1"
+            step="1"
+            value="1"
+          >
+
         </div>
 
-        <div class="form-group">
-          <label>Unit Price (editable)</label>
-          <input class="price" type="number" min="0" step="0.01" value="">
+
+        <div class="field">
+
+          <label>
+            Unit Price
+          </label>
+
+          <input
+            class="price"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0"
+          >
+
         </div>
 
-        <div class="form-group">
-          <label>Line Total</label>
-          <input class="line" type="text" value="₦0" readonly>
+
+        <div class="field">
+
+          <label>
+            Line Total
+          </label>
+
+          <div class="line-total">
+            ₦0
+          </div>
+
         </div>
+
       </div>
+
+
+      <div class="item-actions">
+
+        <button
+          class="remove-item danger"
+          type="button"
+        >
+          Remove
+        </button>
+
+      </div>
+
     </div>
+
   </template>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-  <script src="/app.js"></script>
+
+  <!-- =====================================================
+       PDF LIBRARIES
+  ====================================================== -->
+
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+  ></script>
+
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"
+  ></script>
+
+
+  <script
+    src="/app.js"
+  ></script>
+
 </body>
+
 </html>
