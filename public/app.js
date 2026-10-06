@@ -1,192 +1,1196 @@
-const state = { products: [] };
-const $ = selector => document.querySelector(selector);
-const money = value => '₦' + Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
-const today = () => new Date().toISOString().slice(0, 10);
+const state = {
+  products: [],
+  editing: false,
+  editingVoucherNo: null
+};
 
-async function api(path, options = {}) {
-  const response = await fetch('/api' + path, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
-  });
-  const data = await response.json().catch(() => ({ error: 'Invalid server response' }));
-  if (!response.ok) throw new Error(data.error || 'Request failed');
+
+const itemsEl =
+  document.getElementById("items");
+
+const clientNameEl =
+  document.getElementById("clientName");
+
+const dateEl =
+  document.getElementById("date");
+
+const totalEl =
+  document.getElementById("total");
+
+const voucherNumberEl =
+  document.getElementById("voucherNumber");
+
+const saveBtn =
+  document.getElementById("saveBtn");
+
+const clearBtn =
+  document.getElementById("clearBtn");
+
+const cancelEditBtn =
+  document.getElementById("cancelEditBtn");
+
+const voucherModeTitle =
+  document.getElementById("voucherModeTitle");
+
+const voucherModeSubtitle =
+  document.getElementById("voucherModeSubtitle");
+
+const editBadge =
+  document.getElementById("editBadge");
+
+
+/* =========================================================
+   API
+========================================================= */
+
+async function api(
+  url,
+  options = {}
+) {
+
+  const response =
+    await fetch(
+      url,
+      {
+        cache: "no-store",
+        ...options
+      }
+    );
+
+
+  const data =
+    await response.json()
+      .catch(
+        () => ({})
+      );
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      data.error ||
+      "Request failed."
+    );
+
+  }
+
+
   return data;
 }
 
-function setStatus(text, error = false) {
-  const element = $('#status');
-  if (!element) return;
-  element.textContent = text || '';
-  element.style.color = error ? '#b91c1c' : '#4b5563';
-}
 
-function updateTotal() {
-  let total = 0;
-  document.querySelectorAll('.item-card').forEach(card => {
-    const quantity = Number(card.querySelector('.qty')?.value) || 0;
-    const price = Number(card.querySelector('.price')?.value) || 0;
-    total += quantity * price;
-  });
-  const totalElement = $('#grandTotal');
-  if (totalElement) totalElement.textContent = money(total);
-  return total;
-}
+/* =========================================================
+   MONEY
+========================================================= */
 
-function addItem() {
-  const template = $('#itemTemplate');
-  if (!template) throw new Error('Product template not found.');
+function money(
+  value
+) {
 
-  const fragment = document.importNode(template.content, true);
-  const card = fragment.querySelector('.item-card');
-  const product = fragment.querySelector('.product');
-  const price = fragment.querySelector('.price');
-  const qty = fragment.querySelector('.qty');
-  const line = fragment.querySelector('.line');
-  if (!card || !product || !price || !qty || !line) throw new Error('Product form elements are missing.');
-
-  state.products.forEach(p => {
-    const option = document.createElement('option');
-    option.value = p.id;
-    option.textContent = p.description;
-    product.appendChild(option);
-  });
-
-  function recalc() {
-    const selected = state.products.find(p => String(p.id) === String(product.value));
-    if (selected) {
-      if (price.value === '' || price.dataset.auto === '1') {
-        price.value = Number(selected.price) || 0;
-        price.dataset.auto = '1';
+  return (
+    "₦" +
+    Number(
+      value || 0
+    ).toLocaleString(
+      "en-NG",
+      {
+        maximumFractionDigits: 2
       }
-      const title = card.querySelector('.item-title');
-      if (title) title.textContent = selected.description;
-    } else {
-      const title = card.querySelector('.item-title');
-      if (title) title.textContent = 'Select Product';
-    }
+    )
+  );
 
-    const quantity = Number(qty.value) || 0;
-    const unitPrice = Number(price.value) || 0;
-    line.value = money(quantity * unitPrice);
-    updateTotal();
+}
+
+
+/* =========================================================
+   TODAY
+========================================================= */
+
+function today() {
+
+  const now =
+    new Date();
+
+
+  const offset =
+    now.getTimezoneOffset();
+
+
+  const local =
+    new Date(
+      now.getTime() -
+      offset * 60000
+    );
+
+
+  return local
+    .toISOString()
+    .slice(
+      0,
+      10
+    );
+
+}
+
+
+/* =========================================================
+   LOAD PRODUCTS
+========================================================= */
+
+async function loadProducts() {
+
+  state.products =
+    await api(
+      "/api/products?mode=products"
+    );
+
+
+}
+
+
+/* =========================================================
+   PRODUCT OPTIONS
+========================================================= */
+
+function productOptions(
+  selectedId = ""
+) {
+
+  const options = [
+
+    `<option value="">
+      Select product
+    </option>`
+
+  ];
+
+
+  for (
+    const product of
+    state.products
+  ) {
+
+    const selected =
+      product.productId ===
+      selectedId
+        ? "selected"
+        : "";
+
+
+    options.push(
+
+      `<option
+        value="${escapeHtml(product.productId)}"
+        ${selected}
+      >
+        ${escapeHtml(product.description)}
+      </option>`
+
+    );
+
   }
 
-  product.onchange = () => {
-    const selected = state.products.find(p => String(p.id) === String(product.value));
-    if (selected) {
-      price.value = Number(selected.price) || 0;
-      price.dataset.auto = '1';
-    } else {
-      price.value = '';
-      price.dataset.auto = '0';
-    }
-    recalc();
-  };
 
-  qty.oninput = recalc;
-  price.oninput = () => { price.dataset.auto = '0'; recalc(); };
-
-  const remove = fragment.querySelector('.remove');
-  if (remove) remove.onclick = () => { card.remove(); updateTotal(); };
-
-  $('#items').appendChild(fragment);
-  // Deliberately do not select the first product. The new row stays blank.
-  recalc();
+  return options.join("");
 }
+
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeHtml(
+  value
+) {
+
+  return String(
+    value ?? ""
+  )
+
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+
+    .replace(
+      /</g,
+      "&lt;"
+    )
+
+    .replace(
+      />/g,
+      "&gt;"
+    )
+
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+
+}
+
+
+/* =========================================================
+   ADD ITEM
+========================================================= */
+
+function addItem(
+  itemData = null
+) {
+
+  const template =
+    document.getElementById(
+      "itemTemplate"
+    );
+
+
+  const clone =
+    template.content.cloneNode(
+      true
+    );
+
+
+  const row =
+    clone.querySelector(
+      ".item-card"
+    );
+
+  const product =
+    clone.querySelector(
+      ".product"
+    );
+
+  const quantity =
+    clone.querySelector(
+      ".quantity"
+    );
+
+  const price =
+    clone.querySelector(
+      ".price"
+    );
+
+  const lineTotal =
+    clone.querySelector(
+      ".line-total"
+    );
+
+
+  product.innerHTML =
+    productOptions(
+      itemData?.productId ||
+      ""
+    );
+
+
+  quantity.value =
+    itemData?.quantity ??
+    1;
+
+
+  price.value =
+    itemData?.unitPrice ??
+    "";
+
+
+  function updateRow() {
+
+    const productId =
+      product.value;
+
+
+    const selected =
+      state.products.find(
+        p =>
+          p.productId ===
+          productId
+      );
+
+
+    if (
+      selected &&
+      !price.value
+    ) {
+
+      price.value =
+        selected.cartonPrice;
+
+    }
+
+
+    const qty =
+      Number(
+        quantity.value || 0
+      );
+
+
+    const unitPrice =
+      Number(
+        price.value || 0
+      );
+
+
+    const total =
+      qty *
+      unitPrice;
+
+
+    lineTotal.textContent =
+      money(total);
+
+
+    calculateTotal();
+
+  }
+
+
+  product.addEventListener(
+    "change",
+    () => {
+
+      const selected =
+        state.products.find(
+          p =>
+            p.productId ===
+            product.value
+        );
+
+
+      if (selected) {
+
+        price.value =
+          selected.cartonPrice;
+
+      }
+
+
+      updateRow();
+
+    }
+  );
+
+
+  quantity.addEventListener(
+    "input",
+    updateRow
+  );
+
+
+  price.addEventListener(
+    "input",
+    updateRow
+  );
+
+
+  const remove =
+    clone.querySelector(
+      ".remove-item"
+    );
+
+
+  remove.addEventListener(
+    "click",
+    () => {
+
+      row.remove();
+
+      calculateTotal();
+
+    }
+  );
+
+
+  itemsEl.appendChild(
+    clone
+  );
+
+
+  updateRow();
+
+}
+
+
+/* =========================================================
+   CALCULATE TOTAL
+========================================================= */
+
+function calculateTotal() {
+
+  let total = 0;
+
+
+  document
+    .querySelectorAll(
+      ".item-card"
+    )
+    .forEach(
+      row => {
+
+        const quantity =
+          Number(
+            row.querySelector(
+              ".quantity"
+            ).value || 0
+          );
+
+
+        const price =
+          Number(
+            row.querySelector(
+              ".price"
+            ).value || 0
+          );
+
+
+        const line =
+          quantity *
+          price;
+
+
+        row.querySelector(
+          ".line-total"
+        ).textContent =
+          money(line);
+
+
+        total +=
+          line;
+
+      }
+    );
+
+
+  totalEl.textContent =
+    money(total);
+
+}
+
+
+/* =========================================================
+   COLLECT VOUCHER
+========================================================= */
 
 function collect() {
-  const items = [];
-  document.querySelectorAll('.item-card').forEach(card => {
-    const productId = card.querySelector('.product')?.value;
-    const product = state.products.find(p => String(p.id) === String(productId));
-    const quantity = Number(card.querySelector('.qty')?.value) || 0;
-    const unitPrice = Number(card.querySelector('.price')?.value) || 0;
-    if (product && quantity > 0) {
-      items.push({ productId: product.id, description: product.description, quantity, unitPrice, lineTotal: quantity * unitPrice });
-    }
-  });
+
+  const rows =
+    Array.from(
+      document.querySelectorAll(
+        ".item-card"
+      )
+    );
+
+
+  const items =
+    rows.map(
+      row => {
+
+        const productId =
+          row.querySelector(
+            ".product"
+          ).value;
+
+
+        const product =
+          state.products.find(
+            p =>
+              p.productId ===
+              productId
+          );
+
+
+        const quantity =
+          Number(
+            row.querySelector(
+              ".quantity"
+            ).value || 0
+          );
+
+
+        const unitPrice =
+          Number(
+            row.querySelector(
+              ".price"
+            ).value || 0
+          );
+
+
+        return {
+
+          productId,
+
+          description:
+            product?.description ||
+            "",
+
+          quantity,
+
+          unitPrice
+
+        };
+
+      }
+    );
+
+
   return {
-    clientName: $('#clientName')?.value.trim() || '',
-    date: $('#voucherDate')?.value || '',
+
+    clientName:
+      clientNameEl.value.trim(),
+
+    date:
+      dateEl.value,
+
     items
+
   };
+
 }
 
-async function next() {
-  try {
-    const date = $('#voucherDate')?.value || today();
-    const result = await api('/vouchers?mode=next&date=' + encodeURIComponent(date));
-    const element = $('#voucherNo');
-    if (element) element.textContent = result.voucherNo;
-  } catch {
-    const element = $('#voucherNo');
-    if (element) element.textContent = '—';
+
+/* =========================================================
+   SAVE NEW
+========================================================= */
+
+async function saveNew() {
+
+  const voucher =
+    collect();
+
+
+  if (!voucher.clientName) {
+
+    alert(
+      "Enter customer name."
+    );
+
+    return;
+
   }
-}
 
-async function save() {
-  const voucher = collect();
-  if (!voucher.clientName) return setStatus('Enter a client name.', true);
-  if (!voucher.date) return setStatus('Select a date.', true);
-  if (!voucher.items.length) return setStatus('Select at least one product.', true);
+
+  if (!voucher.date) {
+
+    alert(
+      "Select a date."
+    );
+
+    return;
+
+  }
+
+
+  if (!voucher.items.length) {
+
+    alert(
+      "Add at least one product."
+    );
+
+    return;
+
+  }
+
+
+  for (
+    const item of
+    voucher.items
+  ) {
+
+    if (!item.productId) {
+
+      alert(
+        "Select a product for every row."
+      );
+
+      return;
+
+    }
+
+
+    if (
+      item.quantity <= 0
+    ) {
+
+      alert(
+        "Quantity must be greater than zero."
+      );
+
+      return;
+
+    }
+
+  }
+
+
+  saveBtn.disabled =
+    true;
+
+
+  saveBtn.textContent =
+    "Saving...";
+
 
   try {
-    const button = $('#saveBtn');
-    if (button) button.disabled = true;
-    setStatus('Saving…');
-    const result = await api('/vouchers', { method: 'POST', body: JSON.stringify(voucher) });
-    setStatus('Saved ' + result.voucherNo);
-    await next();
-  } catch (error) {
-    setStatus(error.message, true);
-  } finally {
-    const button = $('#saveBtn');
-    if (button) button.disabled = false;
+
+    const result =
+      await api(
+        "/api",
+        {
+
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+              action:
+                "create",
+              ...voucher
+            })
+
+        }
+      );
+
+
+    alert(
+      `Voucher ${result.voucherNo} saved successfully.`
+    );
+
+
+    window.location.href =
+      "/history.html";
+
   }
+
+  catch (error) {
+
+    alert(
+      error.message
+    );
+
+  }
+
+  finally {
+
+    saveBtn.disabled =
+      false;
+
+    saveBtn.textContent =
+      "Save Voucher";
+
+  }
+
 }
+
+
+/* =========================================================
+   UPDATE EXISTING
+========================================================= */
+
+async function updateExisting() {
+
+  const voucher =
+    collect();
+
+
+  if (!voucher.clientName) {
+
+    alert(
+      "Enter customer name."
+    );
+
+    return;
+
+  }
+
+
+  if (!voucher.date) {
+
+    alert(
+      "Select a date."
+    );
+
+    return;
+
+  }
+
+
+  if (!voucher.items.length) {
+
+    alert(
+      "Add at least one product."
+    );
+
+    return;
+
+  }
+
+
+  for (
+    const item of
+    voucher.items
+  ) {
+
+    if (!item.productId) {
+
+      alert(
+        "Select a product for every row."
+      );
+
+      return;
+
+    }
+
+
+    if (
+      item.quantity <= 0
+    ) {
+
+      alert(
+        "Quantity must be greater than zero."
+      );
+
+      return;
+
+    }
+
+  }
+
+
+  saveBtn.disabled =
+    true;
+
+
+  saveBtn.textContent =
+    "Saving Changes...";
+
+
+  try {
+
+    const result =
+      await api(
+        "/api",
+        {
+
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+
+              action:
+                "update",
+
+              voucherNo:
+                state.editingVoucherNo,
+
+              ...voucher
+
+            })
+
+        }
+      );
+
+
+    alert(
+      `Voucher ${result.voucherNo} updated successfully.`
+    );
+
+
+    window.location.href =
+      "/history.html";
+
+  }
+
+  catch (error) {
+
+    alert(
+      error.message
+    );
+
+  }
+
+  finally {
+
+    saveBtn.disabled =
+      false;
+
+    saveBtn.textContent =
+      "Save Changes";
+
+  }
+
+}
+
+
+/* =========================================================
+   LOAD VOUCHER FOR EDIT
+========================================================= */
+
+async function loadForEdit(
+  voucherNo
+) {
+
+  state.editing =
+    true;
+
+  state.editingVoucherNo =
+    voucherNo;
+
+
+  try {
+
+    const voucher =
+      await api(
+        `/api/vouchers?mode=get&voucherNo=${encodeURIComponent(voucherNo)}`
+      );
+
+
+    if (
+      voucher.status !==
+      "Pending"
+    ) {
+
+      alert(
+        "Only Pending vouchers can be edited."
+      );
+
+
+      window.location.href =
+        "/history.html";
+
+      return;
+
+    }
+
+
+    clientNameEl.value =
+      voucher.clientName;
+
+
+    dateEl.value =
+      voucher.date;
+
+
+    itemsEl.innerHTML =
+      "";
+
+
+    for (
+      const item of
+      voucher.items
+    ) {
+
+      addItem(
+        item
+      );
+
+    }
+
+
+    voucherNumberEl.textContent =
+      voucher.voucherNo;
+
+
+    voucherModeTitle.textContent =
+      "Edit Voucher";
+
+
+    voucherModeSubtitle.textContent =
+      "Edit the existing customer order";
+
+
+    editBadge.hidden =
+      false;
+
+
+    saveBtn.textContent =
+      "Save Changes";
+
+
+    cancelEditBtn.hidden =
+      false;
+
+
+    calculateTotal();
+
+  }
+
+  catch (error) {
+
+    alert(
+      error.message
+    );
+
+
+    window.location.href =
+      "/history.html";
+
+  }
+
+}
+
+
+/* =========================================================
+   CANCEL EDIT
+========================================================= */
+
+function cancelEdit() {
+
+  window.location.href =
+    "/history.html";
+
+}
+
+
+/* =========================================================
+   CLEAR FORM
+========================================================= */
+
+function clearForm() {
+
+  clientNameEl.value =
+    "";
+
+
+  dateEl.value =
+    today();
+
+
+  itemsEl.innerHTML =
+    "";
+
+
+  addItem();
+
+  calculateTotal();
+
+}
+
+
+/* =========================================================
+   RESET NUMBERING
+========================================================= */
 
 async function resetToday() {
-  if (!confirm("Reset today\'s voucher numbering?\n\nThis only works when there are no vouchers today.")) return;
-  try {
-    await api('/vouchers', { method: 'POST', body: JSON.stringify({ action: 'reset', date: today() }) });
-    await next();
-    alert("Today's numbering reset.");
-  } catch (error) {
-    alert(error.message);
+
+  const date =
+    today();
+
+
+  const confirmed =
+    confirm(
+      `Reset all voucher numbering for ${date}?\n\nThis will delete today's vouchers and their related records.`
+    );
+
+
+  if (!confirmed) {
+    return;
   }
+
+
+  try {
+
+    await api(
+      "/api",
+      {
+
+        method:
+          "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify({
+
+            action:
+              "reset",
+
+            date
+
+          })
+
+      }
+    );
+
+
+    alert(
+      "Today's vouchers have been reset."
+    );
+
+
+    window.location.reload();
+
+  }
+
+  catch (error) {
+
+    alert(
+      error.message
+    );
+
+  }
+
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+
+async function init() {
+
   try {
-    const date = $('#voucherDate');
-    if (date) date.value = today();
 
-    const add = $('#addItem');
-    if (add) add.onclick = addItem;
+    await loadProducts();
 
-    const saveButton = $('#saveBtn');
-    if (saveButton) saveButton.onclick = save;
 
-    const clear = $('#clearBtn');
-    if (clear) clear.onclick = () => location.reload();
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
 
-    const reset = $('#resetToday');
-    if (reset) reset.onclick = resetToday;
 
-    if (date) date.onchange = next;
+    const editVoucher =
+      params.get(
+        "edit"
+      );
 
-    setStatus('Loading products…');
-    const result = await api('/products');
-    state.products = result.products || [];
-    if (!state.products.length) throw new Error('No products were returned from Google Sheets.');
 
-    // One blank product row is shown initially, but no product is selected.
+    if (editVoucher) {
+
+      await loadForEdit(
+        editVoucher
+      );
+
+      return;
+
+    }
+
+
+    dateEl.value =
+      today();
+
+
+    voucherNumberEl.textContent =
+      "New Voucher";
+
+
     addItem();
-    await next();
-    setStatus('');
-  } catch (error) {
-    console.error('Voucher Manager error:', error);
-    setStatus(error.message, true);
-    alert('Voucher Manager error:\n\n' + error.message);
+
+
+    calculateTotal();
+
   }
-});
+
+  catch (error) {
+
+    console.error(
+      error
+    );
+
+
+    alert(
+      error.message
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   EVENTS
+========================================================= */
+
+document
+  .getElementById(
+    "addItemBtn"
+  )
+  ?.addEventListener(
+    "click",
+    () => addItem()
+  );
+
+
+saveBtn
+  ?.addEventListener(
+    "click",
+    () => {
+
+      if (
+        state.editing
+      ) {
+
+        updateExisting();
+
+      }
+
+      else {
+
+        saveNew();
+
+      }
+
+    }
+  );
+
+
+clearBtn
+  ?.addEventListener(
+    "click",
+    () => {
+
+      if (
+        state.editing
+      ) {
+
+        window.location.href =
+          "/";
+
+      }
+
+      else {
+
+        clearForm();
+
+      }
+
+    }
+  );
+
+
+cancelEditBtn
+  ?.addEventListener(
+    "click",
+    cancelEdit
+  );
+
+
+document
+  .getElementById(
+    "resetTodayBtn"
+  )
+  ?.addEventListener(
+    "click",
+    resetToday
+  );
+
+
+init();
