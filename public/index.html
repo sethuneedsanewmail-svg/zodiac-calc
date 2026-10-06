@@ -19,7 +19,6 @@
 
 </head>
 
-
 <body>
 
   <main class="container">
@@ -38,7 +37,6 @@
 
       </div>
 
-
       <div class="page-nav">
 
         <a
@@ -47,6 +45,10 @@
         >
           Order History
         </a>
+
+        <div class="header-badge">
+          Paper Core
+        </div>
 
       </div>
 
@@ -76,8 +78,8 @@
             Voucher No.
           </span>
 
-          <strong id="voucherNumber">
-            New Voucher
+          <strong id="voucherNo">
+            —
           </strong>
 
           <span
@@ -95,34 +97,30 @@
 
       <div class="form-grid">
 
-        <div class="field">
+        <div class="form-group">
 
-          <label
-            for="clientName"
-          >
-            Customer Name
+          <label for="clientName">
+            Client Name
           </label>
 
           <input
             id="clientName"
             type="text"
-            placeholder="Enter customer name"
+            placeholder="Enter client name"
             autocomplete="off"
           >
 
         </div>
 
 
-        <div class="field">
+        <div class="form-group">
 
-          <label
-            for="date"
-          >
+          <label for="voucherDate">
             Date
           </label>
 
           <input
-            id="date"
+            id="voucherDate"
             type="date"
           >
 
@@ -131,49 +129,51 @@
       </div>
 
 
-      <div class="items-section">
+      <div class="products-header">
 
-        <div class="section-title-row">
+        <div>
 
-          <div>
+          <h3>
+            Products
+          </h3>
 
-            <h3>
-              Products
-            </h3>
-
-            <p>
-              Add products and set quantities/prices
-            </p>
-
-          </div>
-
-
-          <button
-            id="addItemBtn"
-            class="secondary-outline"
-            type="button"
-          >
-            + Add Product
-          </button>
+          <p>
+            Add products and set quantities
+          </p>
 
         </div>
-
-
-        <div
-          id="items"
-          class="items"
-        ></div>
 
       </div>
 
 
-      <div class="total-row">
+      <div
+        id="items"
+        class="items-container"
+      ></div>
+
+
+      <button
+        id="addItem"
+        class="add-product"
+        type="button"
+      >
 
         <span>
-          Grand Total
+          ＋
         </span>
 
-        <strong id="total">
+        Add Product
+
+      </button>
+
+
+      <div class="total-box">
+
+        <span>
+          Total
+        </span>
+
+        <strong id="grandTotal">
           ₦0
         </strong>
 
@@ -192,16 +192,6 @@
 
 
         <button
-          id="cancelEditBtn"
-          class="secondary-outline"
-          type="button"
-          hidden
-        >
-          Cancel Edit
-        </button>
-
-
-        <button
           id="clearBtn"
           class="secondary-outline"
           type="button"
@@ -213,7 +203,7 @@
 
 
       <div
-        id="statusMessage"
+        id="status"
         class="status-message"
       ></div>
 
@@ -225,22 +215,22 @@
       <div>
 
         <h2>
-          Voucher Numbering
+          Numbering
         </h2>
 
         <p>
-          Reset today's numbering and remove today's voucher records.
+          Reset today's voucher number only when there are no saved vouchers for today.
         </p>
 
       </div>
 
 
       <button
-        id="resetTodayBtn"
+        id="resetToday"
         class="danger-large"
         type="button"
       >
-        Reset Today's Numbering
+        Reset Today's Number
       </button>
 
     </section>
@@ -248,17 +238,38 @@
   </main>
 
 
-  <!-- =====================================================
-       ITEM TEMPLATE
-  ====================================================== -->
-
   <template id="itemTemplate">
 
     <div class="item-card">
 
+      <div class="item-card-header">
+
+        <div>
+
+          <span class="item-number">
+            Product
+          </span>
+
+          <strong class="item-title">
+            Select Product
+          </strong>
+
+        </div>
+
+
+        <button
+          type="button"
+          class="remove"
+        >
+          Remove
+        </button>
+
+      </div>
+
+
       <div class="product-grid">
 
-        <div class="field">
+        <div class="form-group product-field">
 
           <label>
             Product
@@ -278,14 +289,14 @@
         </div>
 
 
-        <div class="field">
+        <div class="form-group">
 
           <label>
-            Quantity
+            Quantity (cartons)
           </label>
 
           <input
-            class="quantity"
+            class="qty"
             type="number"
             min="1"
             step="1"
@@ -295,10 +306,10 @@
         </div>
 
 
-        <div class="field">
+        <div class="form-group">
 
           <label>
-            Unit Price
+            Unit Price (editable)
           </label>
 
           <input
@@ -306,35 +317,26 @@
             type="number"
             min="0"
             step="0.01"
-            placeholder="0"
+            value=""
           >
 
         </div>
 
 
-        <div class="field">
+        <div class="form-group">
 
           <label>
             Line Total
           </label>
 
-          <div class="line-total">
-            ₦0
-          </div>
+          <input
+            class="line"
+            type="text"
+            value="₦0"
+            readonly
+          >
 
         </div>
-
-      </div>
-
-
-      <div class="item-actions">
-
-        <button
-          class="remove-item danger"
-          type="button"
-        >
-          Remove
-        </button>
 
       </div>
 
@@ -343,10 +345,6 @@
   </template>
 
 
-  <!-- =====================================================
-       PDF LIBRARIES
-  ====================================================== -->
-
   <script
     src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
   ></script>
@@ -354,7 +352,6 @@
   <script
     src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"
   ></script>
-
 
   <script
     src="/app.js"
