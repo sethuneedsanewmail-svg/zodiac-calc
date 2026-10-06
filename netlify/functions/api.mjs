@@ -402,6 +402,318 @@ async function getVoucher(
 
 
 /* =========================================================
+   UPDATE VOUCHER
+========================================================= */
+
+async function updateVoucher(
+  body
+) {
+
+  const voucherNo =
+    String(
+      body.voucherNo || ""
+    ).trim();
+
+  const clientName =
+    String(
+      body.clientName || ""
+    ).trim();
+
+  const date =
+    d(body.date);
+
+  const items =
+    Array.isArray(body.items)
+      ? body.items
+      : [];
+
+
+  if (!voucherNo) {
+
+    throw new Error(
+      "Voucher number is required."
+    );
+
+  }
+
+
+  if (!clientName) {
+
+    throw new Error(
+      "Customer name is required."
+    );
+
+  }
+
+
+  if (!date) {
+
+    throw new Error(
+      "Date is required."
+    );
+
+  }
+
+
+  if (!items.length) {
+
+    throw new Error(
+      "Add at least one product."
+    );
+
+  }
+
+
+  /* -------------------------------------------------------
+     GET CURRENT HISTORY
+  ------------------------------------------------------- */
+
+  const history =
+    await vals(
+      `${S.history}!A2:G`
+    );
+
+
+  const index =
+    history.findIndex(
+      row =>
+        row[0] === voucherNo
+    );
+
+
+  if (index < 0) {
+
+    throw new Error(
+      "Voucher not found."
+    );
+
+  }
+
+
+  const oldRow =
+    history[index];
+
+
+  const currentStatus =
+    oldRow[4] ||
+    "Pending";
+
+
+  /* -------------------------------------------------------
+     ONLY PENDING VOUCHERS CAN BE EDITED
+  ------------------------------------------------------- */
+
+  if (
+    currentStatus !==
+    "Pending"
+  ) {
+
+    throw new Error(
+      "Only Pending vouchers can be edited."
+    );
+
+  }
+
+
+  /* -------------------------------------------------------
+     CLEAN ITEMS + CALCULATE TOTAL
+  ------------------------------------------------------- */
+
+  const cleanedItems =
+    items.map(
+      item => {
+
+        const productId =
+          String(
+            item.productId || ""
+          ).trim();
+
+        const description =
+          String(
+            item.description || ""
+          ).trim();
+
+        const quantity =
+          Number(
+            item.quantity || 0
+          );
+
+        const unitPrice =
+          parsePrice(
+            item.unitPrice
+          );
+
+        const lineTotal =
+          quantity *
+          unitPrice;
+
+
+        if (!productId) {
+
+          throw new Error(
+            "Every item must have a product."
+          );
+
+        }
+
+
+        if (
+          !Number.isFinite(quantity) ||
+          quantity <= 0
+        ) {
+
+          throw new Error(
+            "Quantity must be greater than zero."
+          );
+
+        }
+
+
+        if (
+          !Number.isFinite(unitPrice) ||
+          unitPrice < 0
+        ) {
+
+          throw new Error(
+            "Invalid product price."
+          );
+
+        }
+
+
+        return [
+
+          voucherNo,
+
+          clientName,
+
+          date,
+
+          productId,
+
+          description,
+
+          quantity,
+
+          unitPrice,
+
+          lineTotal
+
+        ];
+
+      }
+    );
+
+
+  const total =
+    cleanedItems.reduce(
+      (
+        sum,
+        row
+      ) =>
+        sum +
+        parsePrice(row[7]),
+      0
+    );
+
+
+  /* -------------------------------------------------------
+     UPDATE HISTORY ROW
+  ------------------------------------------------------- */
+
+  const newHistoryRow = [
+
+    voucherNo,
+
+    clientName,
+
+    date,
+
+    total,
+
+    "Pending",
+
+    oldRow[5] || "",
+
+    oldRow[6] || ""
+
+  ];
+
+
+  history[index] =
+    newHistoryRow;
+
+
+  /* -------------------------------------------------------
+     REWRITE HISTORY
+  ------------------------------------------------------- */
+
+  await replace(
+
+    `${S.history}!A2:G`,
+
+    history
+
+  );
+
+
+  /* -------------------------------------------------------
+     GET EXISTING VOUCHER ITEMS
+  ------------------------------------------------------- */
+
+  const existingItems =
+    await vals(
+      `${S.items}!A2:H`
+    );
+
+
+  const remainingItems =
+    existingItems.filter(
+      row =>
+        row[0] !== voucherNo
+    );
+
+
+  /* -------------------------------------------------------
+     ADD UPDATED ITEMS
+  ------------------------------------------------------- */
+
+  const finalItems = [
+
+    ...remainingItems,
+
+    ...cleanedItems
+
+  ];
+
+
+  /* -------------------------------------------------------
+     REWRITE VOUCHER ITEMS
+  ------------------------------------------------------- */
+
+  await replace(
+
+    `${S.items}!A2:H`,
+
+    finalItems
+
+  );
+
+
+  return {
+
+    ok: true,
+
+    voucherNo,
+
+    total
+
+  };
+
+}
+
+
+/* =========================================================
    UPDATE HISTORY STATUS
 ========================================================= */
 
@@ -529,8 +841,6 @@ async function deleteVoucher(
   );
 
 
-  /* Remove confirmed order record */
-
   await replace(
 
     `${S.confirmed}!A2:F`,
@@ -543,8 +853,6 @@ async function deleteVoucher(
 
   );
 
-
-  /* Remove confirmed order items */
 
   await replace(
 
@@ -580,8 +888,6 @@ async function confirmVoucher(
     );
 
 
-  /* Already confirmed */
-
   if (
     voucher.status ===
     "Confirmed"
@@ -595,8 +901,6 @@ async function confirmVoucher(
   }
 
 
-  /* Cannot confirm cancelled */
-
   if (
     voucher.status ===
     "Cancelled"
@@ -609,15 +913,11 @@ async function confirmVoucher(
   }
 
 
-  /* Update history */
-
   await updateStatus(
     voucherNo,
     "Confirmed"
   );
 
-
-  /* Check for existing confirmed record */
 
   const confirmed =
     await vals(
@@ -632,8 +932,6 @@ async function confirmVoucher(
         voucherNo
     );
 
-
-  /* Add confirmed order */
 
   if (!alreadyExists) {
 
@@ -663,8 +961,6 @@ async function confirmVoucher(
   }
 
 
-  /* Check confirmed items */
-
   const confirmedItems =
     await vals(
       `${S.confirmedItems}!A2:H`
@@ -678,8 +974,6 @@ async function confirmVoucher(
         voucherNo
     );
 
-
-  /* Add confirmed items */
 
   if (!existingItems) {
 
@@ -727,53 +1021,295 @@ async function confirmVoucher(
 
 
 /* =========================================================
-   CANCEL VOUCHER
+   CREATE VOUCHER
 ========================================================= */
 
-async function cancelVoucher(
-  voucherNo
+async function createVoucher(
+  body
 ) {
 
-  const voucher =
-    await getVoucher(
-      voucherNo
-    );
+  const clientName =
+    String(
+      body.clientName || ""
+    ).trim();
+
+  const date =
+    d(body.date);
+
+  const items =
+    Array.isArray(body.items)
+      ? body.items
+      : [];
 
 
-  /* Already cancelled */
-
-  if (
-    voucher.status ===
-    "Cancelled"
-  ) {
-
-    return {
-      ok: true,
-      alreadyCancelled: true
-    };
-
-  }
-
-
-  /* Cannot cancel confirmed order */
-
-  if (
-    voucher.status ===
-    "Confirmed"
-  ) {
+  if (!clientName) {
 
     throw new Error(
-      "Confirmed vouchers cannot be cancelled."
+      "Customer name is required."
     );
 
   }
 
 
-  /* Pending -> Cancelled */
+  if (!date) {
 
-  await updateStatus(
+    throw new Error(
+      "Date is required."
+    );
+
+  }
+
+
+  if (!items.length) {
+
+    throw new Error(
+      "Add at least one product."
+    );
+
+  }
+
+
+  const voucherNo =
+    await next(date);
+
+
+  const cleanedItems =
+    items.map(
+      item => {
+
+        const productId =
+          String(
+            item.productId || ""
+          ).trim();
+
+        const description =
+          String(
+            item.description || ""
+          ).trim();
+
+        const quantity =
+          Number(
+            item.quantity || 0
+          );
+
+        const unitPrice =
+          parsePrice(
+            item.unitPrice
+          );
+
+        const lineTotal =
+          quantity *
+          unitPrice;
+
+
+        if (!productId) {
+
+          throw new Error(
+            "Every item must have a product."
+          );
+
+        }
+
+
+        if (
+          !Number.isFinite(quantity) ||
+          quantity <= 0
+        ) {
+
+          throw new Error(
+            "Quantity must be greater than zero."
+          );
+
+        }
+
+
+        return [
+
+          voucherNo,
+
+          clientName,
+
+          date,
+
+          productId,
+
+          description,
+
+          quantity,
+
+          unitPrice,
+
+          lineTotal
+
+        ];
+
+      }
+    );
+
+
+  const total =
+    cleanedItems.reduce(
+      (
+        sum,
+        row
+      ) =>
+        sum +
+        parsePrice(row[7]),
+      0
+    );
+
+
+  await append(
+
+    `${S.history}!A2:G`,
+
+    [
+
+      voucherNo,
+
+      clientName,
+
+      date,
+
+      total,
+
+      "Pending",
+
+      "",
+
+      ""
+
+    ]
+
+  );
+
+
+  for (
+    const row of
+    cleanedItems
+  ) {
+
+    await append(
+
+      `${S.items}!A2:H`,
+
+      row
+
+    );
+
+  }
+
+
+  return {
+
+    ok: true,
+
     voucherNo,
-    "Cancelled"
+
+    total
+
+  };
+
+}
+
+
+/* =========================================================
+   RESET TODAY
+========================================================= */
+
+async function resetToday(
+  date
+) {
+
+  const history =
+    await vals(
+      `${S.history}!A2:G`
+    );
+
+
+  const items =
+    await vals(
+      `${S.items}!A2:H`
+    );
+
+
+  const confirmed =
+    await vals(
+      `${S.confirmed}!A2:F`
+    );
+
+
+  const confirmedItems =
+    await vals(
+      `${S.confirmedItems}!A2:H`
+    );
+
+
+  const todaysNumbers =
+    history
+
+      .filter(
+        row =>
+          d(row[2]) === date
+      )
+
+      .map(
+        row =>
+          row[0]
+      );
+
+
+  await replace(
+
+    `${S.history}!A2:G`,
+
+    history.filter(
+      row =>
+        d(row[2]) !== date
+    )
+
+  );
+
+
+  await replace(
+
+    `${S.items}!A2:H`,
+
+    items.filter(
+      row =>
+        !todaysNumbers.includes(
+          row[0]
+        )
+    )
+
+  );
+
+
+  await replace(
+
+    `${S.confirmed}!A2:F`,
+
+    confirmed.filter(
+      row =>
+        !todaysNumbers.includes(
+          row[0]
+        )
+    )
+
+  );
+
+
+  await replace(
+
+    `${S.confirmedItems}!A2:H`,
+
+    confirmedItems.filter(
+      row =>
+        !todaysNumbers.includes(
+          row[0]
+        )
+    )
+
   );
 
 
@@ -785,266 +1321,271 @@ async function cancelVoucher(
 
 
 /* =========================================================
-   MAIN HANDLER
+   PRODUCTS
+========================================================= */
+
+async function getProducts() {
+
+  const rows =
+    await vals(
+      `${S.products}!A2:H`,
+      {
+        valueRenderOption:
+          "FORMATTED_VALUE"
+      }
+    );
+
+
+  return rows
+
+    .filter(
+      row =>
+        String(
+          row[7] || ""
+        ).toLowerCase() ===
+        "yes"
+    )
+
+    .map(
+      row => ({
+
+        productId:
+          row[0] || "",
+
+        category:
+          row[1] || "",
+
+        description:
+          row[2] || "",
+
+        cartonPrice:
+          parsePrice(
+            row[3]
+          ),
+
+        currency:
+          row[4] || "NGN",
+
+        priceUnit:
+          row[5] || "Carton",
+
+        pack:
+          row[6] || "",
+
+        active:
+          row[7] || ""
+
+      })
+    );
+
+}
+
+
+/* =========================================================
+   GET HISTORY
+========================================================= */
+
+async function getHistory() {
+
+  const rows =
+    await vals(
+      `${S.history}!A2:G`
+    );
+
+
+  return rows
+
+    .filter(
+      row =>
+        row[0]
+    )
+
+    .map(
+      row => ({
+
+        no:
+          row[0] || "",
+
+        client:
+          row[1] || "",
+
+        date:
+          d(row[2]),
+
+        total:
+          parsePrice(
+            row[3]
+          ),
+
+        status:
+          row[4] ||
+          "Pending",
+
+        statusDate:
+          row[5] || ""
+
+      })
+    )
+
+    .reverse();
+
+}
+
+
+/* =========================================================
+   ROUTER
 ========================================================= */
 
 export default async function handler(
-  req
+  event
 ) {
 
   try {
 
-    const url =
-      new URL(
-        req.url
-      );
-
-
-    /* =====================================================
-       OPTIONS
-    ===================================================== */
-
     if (
-      req.method ===
+      event.httpMethod ===
       "OPTIONS"
     ) {
 
-      return new Response(
-        "",
-        {
-
-          status: 204,
-
-          headers: {
-
-            "Access-Control-Allow-Origin":
-              "*",
-
-            "Access-Control-Allow-Methods":
-              "GET,POST,OPTIONS",
-
-            "Access-Control-Allow-Headers":
-              "Content-Type"
-
-          }
-
-        }
-      );
+      return res({
+        ok: true
+      });
 
     }
 
 
     /* =====================================================
-       PRODUCTS
+       GET
     ===================================================== */
 
     if (
-
-      req.method ===
-      "GET" &&
-
-      url.pathname.endsWith(
-        "/products"
-      )
-
+      event.httpMethod ===
+      "GET"
     ) {
 
-      const rows =
-        await vals(
+      const params =
+        event.queryStringParameters ||
+        {};
 
-          `${S.products}!A2:H`,
 
-          {
-            valueRenderOption:
-              "FORMATTED_VALUE"
-          }
+      if (
+        params.mode ===
+        "products"
+      ) {
 
+        return res(
+          await getProducts()
         );
 
-
-      const products =
-        rows
-
-          .filter(
-            row => {
-
-              const active =
-                String(
-                  row[7] ?? ""
-                )
-                  .trim()
-                  .toLowerCase();
+      }
 
 
-              return (
-                active !== "false" &&
-                active !== "no"
-              );
+      if (
+        params.mode ===
+        "history"
+      ) {
 
-            }
+        return res(
+          await getHistory()
+        );
+
+      }
+
+
+      if (
+        params.mode ===
+        "get" &&
+        params.voucherNo
+      ) {
+
+        return res(
+          await getVoucher(
+            params.voucherNo
           )
+        );
 
-          .map(
-            row => ({
-
-              id:
-                row[0],
-
-              description:
-                row[2],
-
-              price:
-                parsePrice(
-                  row[3]
-                )
-
-            })
-          );
+      }
 
 
       return res({
-        products
+        ok: true
       });
 
     }
 
 
     /* =====================================================
-       HISTORY
+       POST
     ===================================================== */
 
     if (
-
-      req.method ===
-      "GET" &&
-
-      url.pathname.endsWith(
-        "/history"
-      )
-
-    ) {
-
-      const rows =
-        await vals(
-          `${S.history}!A2:G`
-        );
-
-
-      return res({
-        rows
-      });
-
-    }
-
-
-    /* =====================================================
-       GET VOUCHERS
-    ===================================================== */
-
-    if (
-
-      req.method ===
-      "GET" &&
-
-      url.pathname.endsWith(
-        "/vouchers"
-      )
-
-    ) {
-
-      const mode =
-        url.searchParams.get(
-          "mode"
-        );
-
-
-      /* NEXT NUMBER */
-
-      if (
-        mode ===
-        "next"
-      ) {
-
-        const date =
-          url.searchParams.get(
-            "date"
-          ) ||
-
-          new Date()
-            .toISOString()
-            .slice(0, 10);
-
-
-        return res({
-
-          voucherNo:
-            await next(
-              date
-            )
-
-        });
-
-      }
-
-
-      /* GET ONE VOUCHER */
-
-      if (
-        mode ===
-        "get"
-      ) {
-
-        const voucherNo =
-          url.searchParams.get(
-            "voucherNo"
-          );
-
-
-        if (!voucherNo) {
-
-          throw new Error(
-            "Voucher number is required."
-          );
-
-        }
-
-
-        return res({
-
-          voucher:
-            await getVoucher(
-              voucherNo
-            )
-
-        });
-
-      }
-
-    }
-
-
-    /* =====================================================
-       POST VOUCHERS
-    ===================================================== */
-
-    if (
-
-      req.method ===
-      "POST" &&
-
-      url.pathname.endsWith(
-        "/vouchers"
-      )
-
+      event.httpMethod ===
+      "POST"
     ) {
 
       const body =
-        await req.json();
+        JSON.parse(
+          event.body ||
+          "{}"
+        );
 
 
-      /* ===================================================
-         DELETE
-      =================================================== */
+      if (
+        body.action ===
+        "create"
+      ) {
+
+        return res(
+          await createVoucher(
+            body
+          )
+        );
+
+      }
+
+
+      if (
+        body.action ===
+        "update"
+      ) {
+
+        return res(
+          await updateVoucher(
+            body
+          )
+        );
+
+      }
+
+
+      if (
+        body.action ===
+        "confirm"
+      ) {
+
+        return res(
+          await confirmVoucher(
+            body.voucherNo
+          )
+        );
+
+      }
+
+
+      if (
+        body.action ===
+        "cancel"
+      ) {
+
+        return res(
+          await updateStatus(
+            body.voucherNo,
+            "Cancelled"
+          )
+        );
+
+      }
+
 
       if (
         body.action ===
@@ -1060,308 +1601,50 @@ export default async function handler(
       }
 
 
-      /* ===================================================
-         CONFIRM
-      =================================================== */
-
-      if (
-        body.action ===
-        "confirm"
-      ) {
-
-        if (
-          !body.voucherNo
-        ) {
-
-          throw new Error(
-            "Voucher number is required."
-          );
-
-        }
-
-
-        return res(
-          await confirmVoucher(
-            body.voucherNo
-          )
-        );
-
-      }
-
-
-      /* ===================================================
-         CANCEL
-      =================================================== */
-
-      if (
-        body.action ===
-        "cancel"
-      ) {
-
-        if (
-          !body.voucherNo
-        ) {
-
-          throw new Error(
-            "Voucher number is required."
-          );
-
-        }
-
-
-        return res(
-          await cancelVoucher(
-            body.voucherNo
-          )
-        );
-
-      }
-
-
-      /* ===================================================
-         RESET
-      =================================================== */
-
       if (
         body.action ===
         "reset"
       ) {
 
-        const history =
-          await vals(
-            `${S.history}!A2:G`
-          );
-
-
-        if (
-          history.some(
-            row =>
-              d(row[2]) ===
-              body.date
+        return res(
+          await resetToday(
+            body.date
           )
-        ) {
-
-          throw new Error(
-            "Cannot reset: vouchers already exist for today."
-          );
-
-        }
-
-
-        return res({
-          ok: true
-        });
-
-      }
-
-
-      /* ===================================================
-         VALIDATE NEW VOUCHER
-      =================================================== */
-
-      if (
-        !body.clientName
-      ) {
-
-        throw new Error(
-          "Client name is required."
         );
 
       }
 
 
-      if (
-        !body.date
-      ) {
+      return res(
 
-        throw new Error(
-          "Date is required."
-        );
+        {
+          error:
+            "Unknown action."
+        },
 
-      }
-
-
-      if (
-        !Array.isArray(
-          body.items
-        ) ||
-
-        !body.items.length
-      ) {
-
-        throw new Error(
-          "At least one product is required."
-        );
-
-      }
-
-
-      /* ===================================================
-         CREATE VOUCHER NUMBER
-      =================================================== */
-
-      const voucherNo =
-        await next(
-          body.date
-        );
-
-
-      /* ===================================================
-         CALCULATE TOTAL
-      =================================================== */
-
-      const total =
-        body.items.reduce(
-
-          (
-            sum,
-            item
-          ) => {
-
-            const quantity =
-              Number(
-                item.quantity ||
-                0
-              );
-
-
-            const unitPrice =
-              parsePrice(
-                item.unitPrice
-              );
-
-
-            return (
-              sum +
-              quantity *
-              unitPrice
-            );
-
-          },
-
-          0
-
-        );
-
-
-      /* ===================================================
-         SAVE HISTORY
-      =================================================== */
-
-      await append(
-
-        `${S.history}!A2:G`,
-
-        [
-
-          voucherNo,
-
-          body.clientName,
-
-          body.date,
-
-          total,
-
-          "Pending",
-
-          "",
-
-          ""
-
-        ]
+        400
 
       );
 
-
-      /* ===================================================
-         SAVE ITEMS
-      =================================================== */
-
-      for (
-        const item of
-        body.items
-      ) {
-
-        const quantity =
-          Number(
-            item.quantity ||
-            0
-          );
-
-
-        const unitPrice =
-          parsePrice(
-            item.unitPrice
-          );
-
-
-        const lineTotal =
-          quantity *
-          unitPrice;
-
-
-        await append(
-
-          `${S.items}!A2:H`,
-
-          [
-
-            voucherNo,
-
-            body.clientName,
-
-            body.date,
-
-            item.productId,
-
-            item.description,
-
-            quantity,
-
-            unitPrice,
-
-            lineTotal
-
-          ]
-
-        );
-
-      }
-
-
-      return res({
-
-        ok: true,
-
-        voucherNo,
-
-        total
-
-      });
-
     }
 
-
-    /* =====================================================
-       NOT FOUND
-    ===================================================== */
 
     return res(
 
       {
         error:
-          "Not found"
+          "Method not allowed."
       },
 
-      404
+      405
 
     );
 
+  }
 
-  } catch (error) {
+  catch (error) {
 
     console.error(
-      "Voucher Manager API error:",
       error
     );
 
@@ -1369,11 +1652,9 @@ export default async function handler(
     return res(
 
       {
-
         error:
           error.message ||
-          String(error)
-
+          "Server error."
       },
 
       500
@@ -1383,12 +1664,3 @@ export default async function handler(
   }
 
 }
-
-
-/* =========================================================
-   NETLIFY FUNCTION CONFIG
-========================================================= */
-
-export const config = {
-  path: "/api/*"
-};
