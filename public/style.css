@@ -1182,3 +1182,34 @@ select:focus {
     flex: 1;
   }
 }
+/* =====================================================
+   EDIT MODE
+===================================================== */
+
+.edit-badge {
+  display: inline-block;
+
+  margin-left: 8px;
+
+  padding: 3px 8px;
+
+  border-radius: 999px;
+
+  font-size: 10px;
+
+  font-weight: 700;
+
+  letter-spacing: 0.06em;
+
+  background: #fff3cd;
+
+  color: #856404;
+
+  vertical-align: middle;
+}
+
+
+#cancelEditBtn[hidden],
+#editBadge[hidden] {
+  display: none;
+}
